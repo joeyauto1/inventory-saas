@@ -27,6 +27,19 @@ interface IngredientData {
   line_total: string;
 }
 
+interface RecipeDetail {
+  id: number;
+  name: string;
+  description: string;
+  selling_price: string;
+  portions: number;
+  total_cost: string;
+  cost_per_portion: string;
+  margin: string;
+  margin_pct: string;
+  ingredients: IngredientData[];
+}
+
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<RecipeData[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -39,7 +52,7 @@ export default function RecipesPage() {
 
   // Detail view
   const [selected, setSelected] = useState<number | null>(null);
-  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const [detail, setDetail] = useState<RecipeDetail | null>(null);
 
   // Add ingredient form
   const [ingItemName, setIngItemName] = useState("");

@@ -17,9 +17,16 @@ interface TopItem {
   total_quantity: string;
 }
 
+interface ReportData {
+  period_days: number;
+  total_waste_cost: string;
+  by_reason: ReasonBreakdown[];
+  top_items: TopItem[];
+}
+
 export default function ReportsPage() {
   const [days, setDays] = useState(30);
-  const [data, setData] = useState<Record<string, unknown> | null>(null);
+  const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
 
   const loadReport = async () => {
