@@ -19,7 +19,7 @@ interface TopItem {
 
 export default function ReportsPage() {
   const [days, setDays] = useState(30);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
   const loadReport = async () => {

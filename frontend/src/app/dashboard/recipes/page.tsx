@@ -39,7 +39,7 @@ export default function RecipesPage() {
 
   // Detail view
   const [selected, setSelected] = useState<number | null>(null);
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
 
   // Add ingredient form
   const [ingItemName, setIngItemName] = useState("");
@@ -171,7 +171,7 @@ export default function RecipesPage() {
 
       {!loaded ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">Click "Load" to view recipes</p>
+          <p className="text-gray-500">Click &ldquo;Load&rdquo; to view recipes</p>
         </div>
       ) : recipes.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">

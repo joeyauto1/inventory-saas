@@ -63,7 +63,7 @@ export default function InventoryPage() {
               d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
           </svg>
           <p className="text-gray-500 mb-2">No inventory data loaded</p>
-          <p className="text-sm text-gray-400">Click "Sync from Square" to pull your current stock levels</p>
+          <p className="text-sm text-gray-400">Click &ldquo;Sync from Square&rdquo; to pull your current stock levels</p>
         </div>
       ) : items.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">

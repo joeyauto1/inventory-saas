@@ -46,8 +46,8 @@ export default function WastePage() {
       const data = await res.json();
       setEvents(data.events || []);
       setLoaded(true);
-    } catch (err) {
-      console.error("Failed to load waste events:", err);
+    } catch {
+      console.error("Failed to load waste events");
     }
   };
 
@@ -183,7 +183,7 @@ export default function WastePage() {
 
       {!loaded ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">Click "Load" to view waste log</p>
+          <p className="text-gray-500">Click &ldquo;Load&rdquo; to view waste log</p>
         </div>
       ) : events.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
