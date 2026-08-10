@@ -1,20 +1,20 @@
 """Square API client — catalog, inventory, orders, merchant info."""
 
-from square.client import Client
+from square.client import Square
 from app.config import settings
 from app.services.encryption import decrypt_token
 
 
-def get_client(encrypted_token: str) -> Client:
+def get_client(encrypted_token: str):
     """Create a Square SDK client from an encrypted access token."""
     token = decrypt_token(encrypted_token)
-    return Client(
+    return Square(
         access_token=token,
         environment="sandbox" if settings.SQUARE_SANDBOX else "production",
     )
 
 
-def list_catalog_items(client: Client, cursor: str = None) -> dict:
+def list_catalog_items(client, cursor: str = None) -> dict:
     """Pull all ITEM catalog objects with pagination."""
     body = {"object_types": ["ITEM"]}
     if cursor:
@@ -26,7 +26,7 @@ def list_catalog_items(client: Client, cursor: str = None) -> dict:
 
 
 def get_inventory_counts(
-    client: Client,
+    client,
     catalog_object_ids: list[str],
     location_ids: list[str] = None,
 ) -> dict:
@@ -41,7 +41,7 @@ def get_inventory_counts(
 
 
 def get_inventory_changes(
-    client: Client,
+    client,
     catalog_object_ids: list[str],
     location_ids: list[str] = None,
 ) -> dict:
@@ -55,7 +55,7 @@ def get_inventory_changes(
     return result.body
 
 
-def get_merchant_info(client: Client) -> dict:
+def get_merchant_info(client) -> dict:
     """Get basic merchant info and locations."""
     merch = client.merchants.retrieve_merchant(merchant_id="me")
     if merch.is_error():
@@ -63,7 +63,7 @@ def get_merchant_info(client: Client) -> dict:
     return merch.body
 
 
-def list_locations(client: Client) -> dict:
+def list_locations(client) -> dict:
     """List all locations for a merchant."""
     result = client.locations.list_locations()
     if result.is_error():
