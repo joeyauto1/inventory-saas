@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.merchant import Merchant, Location
 from app.services.square_auth import get_auth_url, exchange_code
 from app.services.square_client import get_client, get_merchant_info, list_locations
+from app.services import stripe_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -67,6 +68,17 @@ async def callback(code: str, db: Session = Depends(get_db)):
         )
         db.add(merchant)
         db.flush()
+
+        # Create Stripe customer
+        try:
+            stripe_customer_id = stripe_service.create_customer(
+                merchant_id=merchant.id,
+                email=merch_info.get("merchant", {}).get("email", ""),
+                name=merch_info.get("merchant", {}).get("business_name", ""),
+            )
+            merchant.stripe_customer_id = stripe_customer_id
+        except Exception:
+            pass  # Don't block signup if Stripe fails — they'll be prompted later
 
     # Upsert locations
     for loc in locs.get("locations", []):
