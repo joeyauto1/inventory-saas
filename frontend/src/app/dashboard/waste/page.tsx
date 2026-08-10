@@ -57,8 +57,19 @@ export default function WastePage() {
     setMessage("");
 
     try {
-      const res = await fetch(`${API_URL}/api/waste?merchant_id=${MERCHANT_ID}&location_id=${LOCATION_ID}&square_catalog_object_id=manual&item_name=${encodeURIComponent(itemName)}&quantity=${quantity}&reason=${reason}&cost_per_unit=${costPerUnit || "0"}&notes=${encodeURIComponent(notes)}`, {
+      const res = await fetch(`${API_URL}/api/waste`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          merchant_id: MERCHANT_ID,
+          location_id: LOCATION_ID,
+          square_catalog_object_id: "manual",
+          item_name: itemName,
+          quantity: parseFloat(quantity) || 0,
+          reason: reason,
+          cost_per_unit: parseFloat(costPerUnit) || 0,
+          notes: notes,
+        }),
       });
       const data = await res.json();
 

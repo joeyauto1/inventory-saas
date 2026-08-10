@@ -3,57 +3,52 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.waste import WasteEvent
 
 router = APIRouter(prefix="/api/waste", tags=["waste"])
 
-
-# TODO: Replace with real auth middleware
-def _verify_merchant(db: Session, merchant_id: int):
-    # Basic check — real auth would come from JWT
-    pass
-
-
 VALID_REASONS = ["spoilage", "overprep", "dropped", "expired", "trim", "other"]
 
 
+class WasteLogRequest(BaseModel):
+    merchant_id: int
+    location_id: int
+    square_catalog_object_id: str
+    item_name: str
+    quantity: float
+    reason: str
+    variation_name: str = ""
+    unit: str = "each"
+    cost_per_unit: float = 0.0
+    notes: str = ""
+
+
 @router.post("")
-async def log_waste(
-    merchant_id: int,
-    location_id: int,
-    square_catalog_object_id: str,
-    item_name: str,
-    quantity: float,
-    reason: str,
-    variation_name: str = "",
-    unit: str = "each",
-    cost_per_unit: float = None,
-    notes: str = "",
-    db: Session = Depends(get_db),
-):
+async def log_waste(body: WasteLogRequest, db: Session = Depends(get_db)):
     """Record a waste event."""
-    if reason not in VALID_REASONS:
+    if body.reason not in VALID_REASONS:
         raise HTTPException(status_code=400, detail=f"Invalid reason. Must be one of: {VALID_REASONS}")
 
-    if quantity <= 0:
+    if body.quantity <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be positive")
 
-    total_cost = round(quantity * (cost_per_unit or 0), 2)
+    total_cost = round(body.quantity * (body.cost_per_unit or 0), 2)
 
     event = WasteEvent(
-        merchant_id=merchant_id,
-        location_id=location_id,
-        square_catalog_object_id=square_catalog_object_id,
-        item_name=item_name,
-        variation_name=variation_name,
-        quantity=quantity,
-        unit=unit,
-        reason=reason,
-        cost_per_unit=cost_per_unit or 0,
+        merchant_id=body.merchant_id,
+        location_id=body.location_id,
+        square_catalog_object_id=body.square_catalog_object_id,
+        item_name=body.item_name,
+        variation_name=body.variation_name,
+        quantity=body.quantity,
+        unit=body.unit,
+        reason=body.reason,
+        cost_per_unit=body.cost_per_unit or 0,
         total_cost=total_cost,
-        notes=notes,
+        notes=body.notes,
     )
     db.add(event)
     db.commit()
@@ -78,7 +73,6 @@ async def list_waste(
     if reason:
         query = query.filter_by(reason=reason)
 
-    # Filter by date range (last N days)
     from datetime import datetime, timedelta
     cutoff = datetime.utcnow() - timedelta(days=days)
     query = query.filter(WasteEvent.recorded_at >= cutoff)
@@ -114,7 +108,6 @@ async def waste_summary(
     from datetime import datetime, timedelta
     cutoff = datetime.utcnow() - timedelta(days=days)
 
-    # Total by reason
     by_reason = (
         db.query(
             WasteEvent.reason,
@@ -127,7 +120,6 @@ async def waste_summary(
         .all()
     )
 
-    # Top wasted items
     top_items = (
         db.query(
             WasteEvent.item_name,
@@ -142,7 +134,6 @@ async def waste_summary(
         .all()
     )
 
-    # Grand total
     grand_total = (
         db.query(func.sum(WasteEvent.total_cost))
         .filter(WasteEvent.merchant_id == merchant_id)

@@ -57,8 +57,15 @@ export default function RecipesPage() {
   const createRecipe = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    await fetch(`${API_URL}/api/recipes?merchant_id=${MERCHANT_ID}&name=${encodeURIComponent(name)}&selling_price=${sellingPrice || "0"}&portions=${portions}`, {
+    await fetch(`${API_URL}/api/recipes`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        merchant_id: MERCHANT_ID,
+        name: name,
+        selling_price: parseFloat(sellingPrice) || 0,
+        portions: parseInt(portions) || 1,
+      }),
     });
     setName("");
     setSellingPrice("");
@@ -77,8 +84,19 @@ export default function RecipesPage() {
   const addIngredient = async () => {
     if (!selected || !ingItemName || !ingQty) return;
     await fetch(
-      `${API_URL}/api/recipes/${selected}/ingredients?merchant_id=${MERCHANT_ID}&square_catalog_object_id=manual&item_name=${encodeURIComponent(ingItemName)}&quantity=${ingQty}&unit=${ingUnit}&cost_per_unit=${ingCost || "0"}`,
-      { method: "POST" }
+      `${API_URL}/api/recipes/${selected}/ingredients`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          merchant_id: MERCHANT_ID,
+          square_catalog_object_id: "manual",
+          item_name: ingItemName,
+          quantity: parseFloat(ingQty) || 0,
+          unit: ingUnit,
+          cost_per_unit: parseFloat(ingCost) || 0,
+        }),
+      }
     );
     setIngItemName("");
     setIngQty("");

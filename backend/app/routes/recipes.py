@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.recipe import Recipe, RecipeIngredient
@@ -10,22 +10,32 @@ from app.models.recipe import Recipe, RecipeIngredient
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
 
+class CreateRecipeRequest(BaseModel):
+    merchant_id: int
+    name: str
+    description: str = ""
+    selling_price: float = 0
+    portions: int = 1
+
+
+class CreateIngredientRequest(BaseModel):
+    merchant_id: int
+    square_catalog_object_id: str
+    item_name: str
+    quantity: float
+    unit: str
+    cost_per_unit: float = 0.0
+
+
 @router.post("")
-async def create_recipe(
-    merchant_id: int,
-    name: str,
-    description: str = "",
-    selling_price: float = 0,
-    portions: int = 1,
-    db: Session = Depends(get_db),
-):
+async def create_recipe(body: CreateRecipeRequest, db: Session = Depends(get_db)):
     """Create a new recipe."""
     recipe = Recipe(
-        merchant_id=merchant_id,
-        name=name,
-        description=description,
-        selling_price=selling_price,
-        portions=portions,
+        merchant_id=body.merchant_id,
+        name=body.name,
+        description=body.description,
+        selling_price=body.selling_price,
+        portions=body.portions,
     )
     db.add(recipe)
     db.commit()
@@ -40,7 +50,6 @@ async def list_recipes(merchant_id: int, db: Session = Depends(get_db)):
 
     result = []
     for r in recipes:
-        # Calculate total ingredient cost
         ingredients = (
             db.query(RecipeIngredient).filter_by(recipe_id=r.id).all()
         )
@@ -120,18 +129,13 @@ async def get_recipe(recipe_id: int, merchant_id: int, db: Session = Depends(get
 @router.post("/{recipe_id}/ingredients")
 async def add_ingredient(
     recipe_id: int,
-    merchant_id: int,
-    square_catalog_object_id: str,
-    item_name: str,
-    quantity: float,
-    unit: str,
-    cost_per_unit: float = 0,
+    body: CreateIngredientRequest,
     db: Session = Depends(get_db),
 ):
     """Add an ingredient to a recipe."""
     recipe = (
         db.query(Recipe)
-        .filter_by(id=recipe_id, merchant_id=merchant_id)
+        .filter_by(id=recipe_id, merchant_id=body.merchant_id)
         .first()
     )
     if not recipe:
@@ -139,11 +143,11 @@ async def add_ingredient(
 
     ingredient = RecipeIngredient(
         recipe_id=recipe_id,
-        square_catalog_object_id=square_catalog_object_id,
-        item_name=item_name,
-        quantity=quantity,
-        unit=unit,
-        cost_per_unit=cost_per_unit,
+        square_catalog_object_id=body.square_catalog_object_id,
+        item_name=body.item_name,
+        quantity=body.quantity,
+        unit=body.unit,
+        cost_per_unit=body.cost_per_unit,
     )
     db.add(ingredient)
     db.commit()
