@@ -83,7 +83,7 @@ export default function WastePage() {
       } else {
         setMessage("Error logging waste");
       }
-    } catch (err) {
+    } catch {
       setMessage("Network error");
     } finally {
       setSubmitting(false);
