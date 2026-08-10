@@ -19,8 +19,9 @@ SCOPES = [
 def get_auth_url() -> str:
     """Build the Square OAuth authorization URL."""
     scope = "+".join(SCOPES)
+    base = "https://connect.squareup.com/oauth2/authorize"
     return (
-        f"{SQUARE_AUTH_URL}"
+        f"{base}"
         f"?client_id={settings.SQUARE_APP_ID}"
         f"&scope={scope}"
         f"&session=false"

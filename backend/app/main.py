@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routes import auth, webhooks, inventory, waste, recipes, reports, billing
+from app.routes import auth, webhooks, inventory, waste, recipes, reports, billing, debug
 
 app = FastAPI(title="Inventory SaaS", version="0.1.0")
 
@@ -23,6 +23,7 @@ app.include_router(waste.router)
 app.include_router(recipes.router)
 app.include_router(reports.router)
 app.include_router(billing.router)
+app.include_router(debug.router)
 
 
 @app.get("/api/health")
