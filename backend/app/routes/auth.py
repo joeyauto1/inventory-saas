@@ -22,6 +22,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 OAUTH_STATE_COOKIE = "oauth_state"
 OAUTH_STATE_MAX_AGE = 600  # 10 minutes — long enough to authorise, short enough to expire
+SESSION_COOKIE = "session_token"
+SESSION_MAX_AGE = 60 * 60 * 24 * 7  # 7 days — matches JWT_EXPIRE_MINUTES
 
 
 def _create_jwt(merchant_id: int) -> str:
@@ -156,10 +158,21 @@ async def callback(
 
         db.commit()
 
-        # Create JWT and redirect to frontend
+        # Create JWT and redirect to frontend. The token is set as an
+        # HttpOnly cookie so it never appears in browser history, Referer
+        # headers, or proxy logs.
         token = _create_jwt(merchant.id)
         response = RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/dashboard?token={token}"
+            url=f"{settings.FRONTEND_URL}/dashboard"
+        )
+        response.set_cookie(
+            SESSION_COOKIE,
+            token,
+            max_age=SESSION_MAX_AGE,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            path="/",
         )
         # State is single-use — burn it so the same value can't be replayed.
         response.delete_cookie(OAUTH_STATE_COOKIE, path="/auth")
