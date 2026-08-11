@@ -7,6 +7,8 @@ from app.services.encryption import encrypt_token
 
 SQUARE_AUTH_URL = "https://connect.squareup.com/oauth2/authorize"
 SQUARE_TOKEN_URL = "https://connect.squareup.com/oauth2/token"
+SQUARE_SANDBOX_AUTH_URL = "https://connect.squareupsandbox.com/oauth2/authorize"
+SQUARE_SANDBOX_TOKEN_URL = "https://connect.squareupsandbox.com/oauth2/token"
 
 SCOPES = [
     "INVENTORY_READ",
@@ -19,7 +21,11 @@ SCOPES = [
 def get_auth_url() -> str:
     """Build the Square OAuth authorization URL."""
     scope = "+".join(SCOPES)
-    base = "https://connect.squareup.com/oauth2/authorize"
+    base = (
+        "https://connect.squareupsandbox.com/oauth2/authorize"
+        if settings.SQUARE_SANDBOX
+        else "https://connect.squareup.com/oauth2/authorize"
+    )
     return (
         f"{base}"
         f"?client_id={settings.SQUARE_APP_ID}"
@@ -30,9 +36,14 @@ def get_auth_url() -> str:
 
 async def exchange_code(code: str) -> dict:
     """Exchange an OAuth authorization code for tokens."""
+    token_url = (
+        SQUARE_SANDBOX_TOKEN_URL
+        if settings.SQUARE_SANDBOX
+        else SQUARE_TOKEN_URL
+    )
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            SQUARE_TOKEN_URL,
+            token_url,
             json={
                 "client_id": settings.SQUARE_APP_ID,
                 "client_secret": settings.SQUARE_APP_SECRET,
