@@ -33,5 +33,11 @@ class Settings:
     FRONTEND_URL: str = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     TRIAL_DAYS: int = 14
 
+    # Diagnostics. Off unless explicitly enabled — /api/debug/env discloses which
+    # secrets are configured and should never be reachable in normal operation.
+    DEBUG_ENDPOINT_ENABLED: bool = (
+        os.environ.get("DEBUG_ENDPOINT_ENABLED", "false").lower() == "true"
+    )
+
 
 settings = Settings()

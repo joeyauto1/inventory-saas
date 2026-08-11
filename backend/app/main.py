@@ -23,7 +23,11 @@ app.include_router(waste.router)
 app.include_router(recipes.router)
 app.include_router(reports.router)
 app.include_router(billing.router)
-app.include_router(debug.router)
+
+# Diagnostics only — set DEBUG_ENDPOINT_ENABLED=true to expose, and unset it again
+# afterwards. Leaving this on in production discloses configuration state publicly.
+if settings.DEBUG_ENDPOINT_ENABLED:
+    app.include_router(debug.router)
 
 
 @app.get("/api/health")

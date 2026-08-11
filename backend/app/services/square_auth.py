@@ -18,18 +18,24 @@ SCOPES = [
 ]
 
 
-def get_auth_url() -> str:
-    """Build the Square OAuth authorization URL."""
+def get_auth_url(state: str) -> str:
+    """Build the Square OAuth authorization URL.
+
+    `state` is echoed back by Square on the callback and must be verified
+    there — it is what stops an attacker binding their Square account to
+    someone else's session.
+    """
     scope = "+".join(SCOPES)
     base = (
-        "https://connect.squareupsandbox.com/oauth2/authorize"
+        SQUARE_SANDBOX_AUTH_URL
         if settings.SQUARE_SANDBOX
-        else "https://connect.squareup.com/oauth2/authorize"
+        else SQUARE_AUTH_URL
     )
     return (
         f"{base}"
         f"?client_id={settings.SQUARE_APP_ID}"
         f"&scope={scope}"
+        f"&state={state}"
     )
 
 
