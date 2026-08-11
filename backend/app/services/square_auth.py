@@ -24,6 +24,10 @@ def get_auth_url(state: str) -> str:
     `state` is echoed back by Square on the callback and must be verified
     there — it is what stops an attacker binding their Square account to
     someone else's session.
+
+    Explicitly sets ``redirect_uri`` so the token exchange can also send it
+    (required by Square's marketplace review checklist). Must match the
+    redirect URL registered in the Developer Console.
     """
     scope = "+".join(SCOPES)
     base = (
@@ -36,11 +40,17 @@ def get_auth_url(state: str) -> str:
         f"?client_id={settings.SQUARE_APP_ID}"
         f"&scope={scope}"
         f"&state={state}"
+        f"&redirect_uri={settings.REDIRECT_URI}"
     )
 
 
 async def exchange_code(code: str) -> dict:
-    """Exchange an OAuth authorization code for tokens."""
+    """Exchange an OAuth authorization code for tokens.
+
+    Sends ``redirect_uri`` explicitly — OAuth 2.0 requires it in the token
+    exchange when it was present in the authorization request, and omitting
+    it is flagged during Square marketplace review.
+    """
     token_url = (
         SQUARE_SANDBOX_TOKEN_URL
         if settings.SQUARE_SANDBOX
@@ -54,6 +64,7 @@ async def exchange_code(code: str) -> dict:
                 "client_secret": settings.SQUARE_APP_SECRET,
                 "code": code,
                 "grant_type": "authorization_code",
+                "redirect_uri": settings.REDIRECT_URI,
             },
         )
         resp.raise_for_status()

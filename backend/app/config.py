@@ -33,6 +33,13 @@ class Settings:
     FRONTEND_URL: str = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     TRIAL_DAYS: int = 14
 
+    # OAuth callback — must match what's registered in the Square Developer Console.
+    # Defaults to {FRONTEND_URL}/auth/callback which is the standard pattern.
+    REDIRECT_URI: str = os.environ.get(
+        "REDIRECT_URI",
+        f"{FRONTEND_URL}/auth/callback",
+    )
+
     # Diagnostics. Off unless explicitly enabled — /api/debug/env discloses which
     # secrets are configured and should never be reachable in normal operation.
     DEBUG_ENDPOINT_ENABLED: bool = (
