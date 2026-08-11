@@ -30,7 +30,6 @@ def get_auth_url() -> str:
         f"{base}"
         f"?client_id={settings.SQUARE_APP_ID}"
         f"&scope={scope}"
-        f"&session=false"
     )
 
 
