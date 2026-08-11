@@ -25,4 +25,9 @@ def test_health_endpoint_still_reachable():
         resp = client.get("/api/health")
 
     assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
+    # "ok" or "degraded" depending on whether a database is reachable — the
+    # point of this test is that the route answers at all. Health deliberately
+    # returns 200 even when degraded so a failing deploy stays diagnosable
+    # rather than being rolled back to stale code by Render's health check.
+    assert resp.json()["status"] in ("ok", "degraded")
+    assert resp.json()["version"] == "0.1.0"

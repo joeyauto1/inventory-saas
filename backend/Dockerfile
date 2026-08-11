@@ -7,4 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+RUN chmod +x start.sh
+
+# Migrations run inside start.sh, deliberately NOT chained with '&&' — see the
+# comment block there for why a database failure must not stop the port binding.
+CMD ["./start.sh"]
