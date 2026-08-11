@@ -105,8 +105,8 @@ async def waste_summary(
     db: Session = Depends(get_db),
 ):
     """Aggregated waste summary: total cost by reason, top wasted items."""
-    from datetime import datetime, timedelta
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     by_reason = (
         db.query(

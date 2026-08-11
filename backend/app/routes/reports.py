@@ -19,8 +19,8 @@ async def waste_report(
     db: Session = Depends(get_db),
 ):
     """Waste report: total cost, breakdown by reason, top wasted items."""
-    from datetime import datetime, timedelta
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Total waste cost
     total = (

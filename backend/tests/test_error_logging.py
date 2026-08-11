@@ -17,8 +17,11 @@ from app.routes.auth import OAUTH_STATE_COOKIE
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     """TestClient with the DB dependency stubbed out."""
+    monkeypatch.setenv("BACKEND_URL", "https://test.example.com")
+    from app.config import settings as _s
+    monkeypatch.setattr(_s, "REDIRECT_URI", "https://test.example.com/auth/callback")
     app.dependency_overrides[get_db] = lambda: None
     with TestClient(app) as c:
         yield c

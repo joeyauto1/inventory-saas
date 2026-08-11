@@ -4,7 +4,7 @@ import secrets
 import sys
 import traceback
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request, HTTPException, Depends, Cookie
 from fastapi.responses import RedirectResponse
@@ -27,7 +27,7 @@ SESSION_MAX_AGE = 60 * 60 * 24 * 7  # 7 days — matches JWT_EXPIRE_MINUTES
 
 
 def _create_jwt(merchant_id: int) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     return jwt.encode(
         {"sub": str(merchant_id), "exp": expire},
         settings.JWT_SECRET,
@@ -36,7 +36,7 @@ def _create_jwt(merchant_id: int) -> str:
 
 
 def _log_exception(exc: Exception, correlation_id: str) -> None:
-    """Log a structured error to stdout so Render's Logs tab captures it.
+    """Log a structured error to stderr so Render's Logs tab captures it.
 
     Prints the exception type, message, full traceback, and correlation ID.
     The same ID is returned to the merchant so they can quote it to support.
@@ -107,7 +107,7 @@ async def callback(
             .first()
         )
 
-        trial_end = datetime.utcnow() + timedelta(days=settings.TRIAL_DAYS)
+        trial_end = datetime.now(timezone.utc) + timedelta(days=settings.TRIAL_DAYS)
 
         if merchant:
             merchant.access_token = token_data["access_token"]

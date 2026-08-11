@@ -16,13 +16,15 @@ from app.routes.auth import OAUTH_STATE_COOKIE
 
 
 @pytest.fixture
-def client():
-    """TestClient with the DB dependency stubbed out.
+def client(monkeypatch):
+    """TestClient with the DB dependency stubbed out and OAuth config set.
 
     The state check must reject before anything touches the database, so a
     null session is sufficient — and if a rejection path ever starts hitting
     the DB, these tests will fail loudly rather than silently connecting.
     """
+    from app.config import settings as _s
+    monkeypatch.setattr(_s, "REDIRECT_URI", "https://test.example.com/auth/callback")
     app.dependency_overrides[get_db] = lambda: None
     with TestClient(app) as c:
         yield c

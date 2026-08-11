@@ -31,13 +31,20 @@ class Settings:
 
     # App
     FRONTEND_URL: str = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    # The backend's own public URL — used for OAuth redirects and webhook
+    # registration. Must be set to the Render service URL in production
+    # (e.g. https://inventory-saas-4.onrender.com).
+    BACKEND_URL: str = os.environ.get("BACKEND_URL", "")
     TRIAL_DAYS: int = 14
 
-    # OAuth callback — must match what's registered in the Square Developer Console.
-    # Defaults to {FRONTEND_URL}/auth/callback which is the standard pattern.
+    # OAuth redirect URI — must match exactly what is registered in the
+    # Square Developer Console under OAuth > Redirect URL. Set explicitly
+    # via REDIRECT_URI, or leave unset and it will be computed from
+    # BACKEND_URL. If neither provides a value the OAuth routes will raise
+    # a clear error at call time rather than sending Square a wrong URL.
     REDIRECT_URI: str = os.environ.get(
         "REDIRECT_URI",
-        f"{FRONTEND_URL}/auth/callback",
+        f"{BACKEND_URL}/auth/callback" if BACKEND_URL else "",
     )
 
     # Diagnostics. Off unless explicitly enabled — /api/debug/env discloses which
