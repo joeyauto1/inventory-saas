@@ -184,12 +184,11 @@ def _run(cleanup_only: bool = False):
     settings.STRIPE_SECRET_KEY = stripe_key
     settings.STRIPE_PRICE_ID = price_id
 
-    # livemode guard — never create a live object.
-    acct = stripe.Account.retrieve()
-    livemode = getattr(acct, "livemode", None)
-    if livemode:
-        raise SystemExit("ABORT: Stripe account is in live mode. Test mode only.")
-    print(f"    livemode             {livemode}")
+    # livemode guard — never create a live object. The sk_test_ prefix check
+    # above is the primary gate; this is the secondary check on a real object.
+    # Account.retrieve() exposes livemode inconsistently across API versions,
+    # so we read it from the created customer below (before any charge) instead.
+    print(f"    livemode             (checked on created customer)")
 
     Session = _connect_db(database_url)
 
@@ -237,6 +236,12 @@ def _run(cleanup_only: bool = False):
     )
     _set_merchant_stripe_customer(Session, merchant_id, customer_id)
     print(f"    stripe_customer_id = {customer_id}")
+
+    # livemode guard on the real object, before any charge is made.
+    customer = stripe.Customer.retrieve(customer_id)
+    if getattr(customer, "livemode", False):
+        raise SystemExit("ABORT: created customer is in live mode. Test mode only.")
+    print(f"    livemode             {getattr(customer, 'livemode', None)}")
 
     print("=== attaching test card pm_card_visa as default ===")
     pm = stripe.PaymentMethod.attach("pm_card_visa", customer=customer_id)

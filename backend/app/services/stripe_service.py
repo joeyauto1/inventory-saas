@@ -129,9 +129,6 @@ def create_subscription(
         "subscription_id": subscription.id,
         "status": subscription.status,
         "trial_end": subscription.trial_end,
-        "client_secret": subscription.latest_invoice.payment_intent.client_secret
-        if subscription.latest_invoice and subscription.latest_invoice.payment_intent
-        else None,
     }
 
 
