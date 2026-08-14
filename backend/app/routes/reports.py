@@ -1,31 +1,37 @@
-"""Reporting API routes — waste reports, COGS, inventory valuation."""
+"""Reporting API routes — waste reports, COGS, inventory valuation.
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+Authorization: the merchant is resolved from the session JWT cookie via
+``get_current_merchant``. ``merchant_id`` is never accepted from the client.
+"""
+
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.waste import WasteEvent
+from app.dependencies import get_current_merchant
 from app.models.merchant import Merchant
-from app.services.square_client import get_client, list_catalog_items, get_inventory_counts
+from app.models.waste import WasteEvent
+from app.services.square_client import get_client, get_inventory_counts, list_catalog_items
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
 @router.get("/waste")
 async def waste_report(
-    merchant_id: int,
     days: int = Query(default=30, ge=1, le=365),
+    merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
     """Waste report: total cost, breakdown by reason, top wasted items."""
-    from datetime import datetime, timedelta, timezone
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Total waste cost
     total = (
         db.query(func.sum(WasteEvent.total_cost))
-        .filter(WasteEvent.merchant_id == merchant_id)
+        .filter(WasteEvent.merchant_id == merchant.id)
         .filter(WasteEvent.recorded_at >= cutoff)
         .scalar()
     ) or 0
@@ -37,7 +43,7 @@ async def waste_report(
             func.sum(WasteEvent.total_cost).label("total"),
             func.count(WasteEvent.id).label("count"),
         )
-        .filter(WasteEvent.merchant_id == merchant_id)
+        .filter(WasteEvent.merchant_id == merchant.id)
         .filter(WasteEvent.recorded_at >= cutoff)
         .group_by(WasteEvent.reason)
         .order_by(func.sum(WasteEvent.total_cost).desc())
@@ -51,7 +57,7 @@ async def waste_report(
             func.sum(WasteEvent.total_cost).label("total"),
             func.sum(WasteEvent.quantity).label("qty"),
         )
-        .filter(WasteEvent.merchant_id == merchant_id)
+        .filter(WasteEvent.merchant_id == merchant.id)
         .filter(WasteEvent.recorded_at >= cutoff)
         .group_by(WasteEvent.item_name)
         .order_by(func.sum(WasteEvent.total_cost).desc())
@@ -75,11 +81,11 @@ async def waste_report(
 
 @router.get("/cogs")
 async def cogs_estimate(
-    merchant_id: int,
+    merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
     """Theoretical COGS based on recipe costs and recent sales data.
-    
+
     For MVP, this returns a basic inventory valuation since we don't
     pull order data from Square yet. Full COGS will need order history
     cross-referenced with recipe costs.
@@ -94,14 +100,10 @@ async def cogs_estimate(
 
 @router.get("/inventory-valuation")
 async def inventory_valuation(
-    merchant_id: int,
+    merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
     """Estimate total inventory value based on current stock from Square."""
-    merchant = db.query(Merchant).filter_by(id=merchant_id).first()
-    if not merchant:
-        return {"error": "Merchant not found"}
-
     client = get_client(merchant.access_token)
 
     # Pull catalog to get item variations

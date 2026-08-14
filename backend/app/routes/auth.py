@@ -127,16 +127,24 @@ async def callback(
             db.add(merchant)
             db.flush()
 
-            # Create Stripe customer
+            # Create (or recover) the Stripe customer. Idempotent and keyed on
+            # merchant_id in metadata, so a retry can't mint a duplicate. Any
+            # failure is logged with the merchant id and the Stripe error — it
+            # must never be silently swallowed again (Standards §5, §9).
             try:
-                stripe_customer_id = stripe_service.create_customer(
+                merchant.stripe_customer_id = stripe_service.get_or_create_customer(
                     merchant_id=merchant.id,
                     email=merch_info.get("merchant", {}).get("email", ""),
                     name=merch_info.get("merchant", {}).get("business_name", ""),
                 )
-                merchant.stripe_customer_id = stripe_customer_id
-            except Exception:
-                pass  # Don't block signup if Stripe fails — they'll be prompted later
+            except Exception as exc:
+                print(
+                    f"[ERROR] correlation_id={correlation_id} "
+                    f"merchant_id={merchant.id} "
+                    f"stripe_customer_creation_failed "
+                    f"type={type(exc).__name__} message={exc}",
+                    file=sys.stderr,
+                )
 
         # Upsert locations
         for loc in locs.get("locations", []):

@@ -1,17 +1,22 @@
-"""Recipe costing API routes — CRUD recipes and ingredients."""
+"""Recipe costing API routes — CRUD recipes and ingredients.
+
+Authorization: the merchant is resolved from the session JWT cookie via
+``get_current_merchant``. ``merchant_id`` is never accepted from the client.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import get_current_merchant
+from app.models.merchant import Merchant
 from app.models.recipe import Recipe, RecipeIngredient
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
 
 class CreateRecipeRequest(BaseModel):
-    merchant_id: int
     name: str
     description: str = ""
     selling_price: float = 0
@@ -19,7 +24,6 @@ class CreateRecipeRequest(BaseModel):
 
 
 class CreateIngredientRequest(BaseModel):
-    merchant_id: int
     square_catalog_object_id: str
     item_name: str
     quantity: float
@@ -28,10 +32,14 @@ class CreateIngredientRequest(BaseModel):
 
 
 @router.post("")
-async def create_recipe(body: CreateRecipeRequest, db: Session = Depends(get_db)):
+async def create_recipe(
+    body: CreateRecipeRequest,
+    merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
     """Create a new recipe."""
     recipe = Recipe(
-        merchant_id=body.merchant_id,
+        merchant_id=merchant.id,
         name=body.name,
         description=body.description,
         selling_price=body.selling_price,
@@ -44,9 +52,12 @@ async def create_recipe(body: CreateRecipeRequest, db: Session = Depends(get_db)
 
 
 @router.get("")
-async def list_recipes(merchant_id: int, db: Session = Depends(get_db)):
+async def list_recipes(
+    merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
     """List all recipes for the merchant with calculated costs."""
-    recipes = db.query(Recipe).filter_by(merchant_id=merchant_id).all()
+    recipes = db.query(Recipe).filter_by(merchant_id=merchant.id).all()
 
     result = []
     for r in recipes:
@@ -83,11 +94,15 @@ async def list_recipes(merchant_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{recipe_id}")
-async def get_recipe(recipe_id: int, merchant_id: int, db: Session = Depends(get_db)):
+async def get_recipe(
+    recipe_id: int,
+    merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
     """Get a single recipe with its ingredients."""
     recipe = (
         db.query(Recipe)
-        .filter_by(id=recipe_id, merchant_id=merchant_id)
+        .filter_by(id=recipe_id, merchant_id=merchant.id)
         .first()
     )
     if not recipe:
@@ -130,12 +145,13 @@ async def get_recipe(recipe_id: int, merchant_id: int, db: Session = Depends(get
 async def add_ingredient(
     recipe_id: int,
     body: CreateIngredientRequest,
+    merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
     """Add an ingredient to a recipe."""
     recipe = (
         db.query(Recipe)
-        .filter_by(id=recipe_id, merchant_id=body.merchant_id)
+        .filter_by(id=recipe_id, merchant_id=merchant.id)
         .first()
     )
     if not recipe:
@@ -159,13 +175,13 @@ async def add_ingredient(
 async def remove_ingredient(
     recipe_id: int,
     ingredient_id: int,
-    merchant_id: int,
+    merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
     """Remove an ingredient from a recipe."""
     recipe = (
         db.query(Recipe)
-        .filter_by(id=recipe_id, merchant_id=merchant_id)
+        .filter_by(id=recipe_id, merchant_id=merchant.id)
         .first()
     )
     if not recipe:

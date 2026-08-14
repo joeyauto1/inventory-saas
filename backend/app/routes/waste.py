@@ -1,11 +1,20 @@
-"""Waste tracking API routes — log waste events, list, aggregate."""
+"""Waste tracking API routes — log waste events, list, aggregate.
+
+Authorization: the merchant is resolved from the session JWT cookie via
+``get_current_merchant``. ``merchant_id`` is never accepted from the client —
+it is derived server-side.
+"""
+
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import get_current_merchant
+from app.models.merchant import Merchant
 from app.models.waste import WasteEvent
 
 router = APIRouter(prefix="/api/waste", tags=["waste"])
@@ -14,7 +23,6 @@ VALID_REASONS = ["spoilage", "overprep", "dropped", "expired", "trim", "other"]
 
 
 class WasteLogRequest(BaseModel):
-    merchant_id: int
     location_id: int
     square_catalog_object_id: str
     item_name: str
@@ -27,7 +35,11 @@ class WasteLogRequest(BaseModel):
 
 
 @router.post("")
-async def log_waste(body: WasteLogRequest, db: Session = Depends(get_db)):
+async def log_waste(
+    body: WasteLogRequest,
+    merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
     """Record a waste event."""
     if body.reason not in VALID_REASONS:
         raise HTTPException(status_code=400, detail=f"Invalid reason. Must be one of: {VALID_REASONS}")
@@ -38,7 +50,7 @@ async def log_waste(body: WasteLogRequest, db: Session = Depends(get_db)):
     total_cost = round(body.quantity * (body.cost_per_unit or 0), 2)
 
     event = WasteEvent(
-        merchant_id=body.merchant_id,
+        merchant_id=merchant.id,
         location_id=body.location_id,
         square_catalog_object_id=body.square_catalog_object_id,
         item_name=body.item_name,
@@ -59,21 +71,20 @@ async def log_waste(body: WasteLogRequest, db: Session = Depends(get_db)):
 
 @router.get("")
 async def list_waste(
-    merchant_id: int,
     location_id: int = None,
     reason: str = None,
     days: int = Query(default=30, ge=1, le=365),
+    merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
     """List waste events with optional filters."""
-    query = db.query(WasteEvent).filter_by(merchant_id=merchant_id)
+    query = db.query(WasteEvent).filter_by(merchant_id=merchant.id)
 
     if location_id:
         query = query.filter_by(location_id=location_id)
     if reason:
         query = query.filter_by(reason=reason)
 
-    from datetime import datetime, timedelta
     cutoff = datetime.utcnow() - timedelta(days=days)
     query = query.filter(WasteEvent.recorded_at >= cutoff)
 
@@ -100,12 +111,11 @@ async def list_waste(
 
 @router.get("/summary")
 async def waste_summary(
-    merchant_id: int,
     days: int = Query(default=30, ge=1, le=365),
+    merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
     """Aggregated waste summary: total cost by reason, top wasted items."""
-    from datetime import datetime, timedelta, timezone
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     by_reason = (
@@ -114,7 +124,7 @@ async def waste_summary(
             func.sum(WasteEvent.total_cost).label("total"),
             func.count(WasteEvent.id).label("count"),
         )
-        .filter(WasteEvent.merchant_id == merchant_id)
+        .filter(WasteEvent.merchant_id == merchant.id)
         .filter(WasteEvent.recorded_at >= cutoff)
         .group_by(WasteEvent.reason)
         .all()
@@ -126,7 +136,7 @@ async def waste_summary(
             func.sum(WasteEvent.total_cost).label("total"),
             func.sum(WasteEvent.quantity).label("qty"),
         )
-        .filter(WasteEvent.merchant_id == merchant_id)
+        .filter(WasteEvent.merchant_id == merchant.id)
         .filter(WasteEvent.recorded_at >= cutoff)
         .group_by(WasteEvent.item_name)
         .order_by(func.sum(WasteEvent.total_cost).desc())
@@ -136,7 +146,7 @@ async def waste_summary(
 
     grand_total = (
         db.query(func.sum(WasteEvent.total_cost))
-        .filter(WasteEvent.merchant_id == merchant_id)
+        .filter(WasteEvent.merchant_id == merchant.id)
         .filter(WasteEvent.recorded_at >= cutoff)
         .scalar()
     ) or 0
@@ -156,9 +166,13 @@ async def waste_summary(
 
 
 @router.delete("/{event_id}")
-async def delete_waste(event_id: int, merchant_id: int, db: Session = Depends(get_db)):
+async def delete_waste(
+    event_id: int,
+    merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
     """Delete a waste event (undo)."""
-    event = db.query(WasteEvent).filter_by(id=event_id, merchant_id=merchant_id).first()
+    event = db.query(WasteEvent).filter_by(id=event_id, merchant_id=merchant.id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Waste event not found")
     db.delete(event)

@@ -1,32 +1,33 @@
-"""Inventory API routes — current stock, change history, sync."""
+"""Inventory API routes — current stock, change history, sync.
 
-from fastapi import APIRouter, Depends, HTTPException
+Authorization: the merchant is resolved from the session JWT cookie via
+``get_current_merchant``. No route accepts ``merchant_id`` from the client —
+it is derived server-side from the authenticated session.
+"""
+
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.merchant import Merchant, Location
+from app.dependencies import get_current_merchant
+from app.models.merchant import Location, Merchant
 from app.services.square_client import (
     get_client,
-    list_catalog_items,
-    get_inventory_counts,
     get_inventory_changes,
+    get_inventory_counts,
+    list_catalog_items,
 )
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
 
-# TODO: Replace with real auth middleware. For MVP, accept merchant_id as query param.
-def _get_merchant(db: Session, merchant_id: int) -> Merchant:
-    merchant = db.query(Merchant).filter_by(id=merchant_id).first()
-    if not merchant:
-        raise HTTPException(status_code=404, detail="Merchant not found")
-    return merchant
-
-
 @router.get("")
-async def get_inventory(merchant_id: int, location_id: int = None, db: Session = Depends(get_db)):
+async def get_inventory(
+    location_id: int = None,
+    merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
     """Get current inventory levels for the merchant, with optional location filter."""
-    merchant = _get_merchant(db, merchant_id)
     client = get_client(merchant.access_token)
 
     # Pull all catalog items
@@ -35,11 +36,11 @@ async def get_inventory(merchant_id: int, location_id: int = None, db: Session =
 
     # Get location IDs
     locations = (
-        db.query(Location).filter_by(merchant_id=merchant_id, is_active=True).all()
+        db.query(Location).filter_by(merchant_id=merchant.id, is_active=True).all()
     )
     loc_ids = [loc.square_location_id for loc in locations]
     if location_id:
-        loc = db.query(Location).filter_by(id=location_id, merchant_id=merchant_id).first()
+        loc = db.query(Location).filter_by(id=location_id, merchant_id=merchant.id).first()
         if loc:
             loc_ids = [loc.square_location_id]
 
@@ -88,17 +89,16 @@ async def get_inventory(merchant_id: int, location_id: int = None, db: Session =
 @router.get("/{catalog_object_id}/history")
 async def get_inventory_history(
     catalog_object_id: str,
-    merchant_id: int,
     location_id: int = None,
+    merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
     """Get inventory change history for a specific item."""
-    merchant = _get_merchant(db, merchant_id)
     client = get_client(merchant.access_token)
 
     loc_ids = None
     if location_id:
-        loc = db.query(Location).filter_by(id=location_id, merchant_id=merchant_id).first()
+        loc = db.query(Location).filter_by(id=location_id, merchant_id=merchant.id).first()
         if loc:
             loc_ids = [loc.square_location_id]
 
@@ -107,6 +107,9 @@ async def get_inventory_history(
 
 
 @router.post("/sync")
-async def sync_inventory(merchant_id: int, db: Session = Depends(get_db)):
+async def sync_inventory(
+    merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+):
     """Trigger a full re-sync from Square (delegates to get_inventory)."""
-    return await get_inventory(merchant_id=merchant_id, db=db)
+    return await get_inventory(merchant=merchant, db=db)
