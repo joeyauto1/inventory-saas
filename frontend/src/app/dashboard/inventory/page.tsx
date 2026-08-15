@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const MERCHANT_ID = 1; // TODO: get from auth context
-
 interface InventoryItem {
   catalog_object_id: string;
   item_name: string;
@@ -23,7 +20,7 @@ export default function InventoryPage() {
   const syncInventory = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/inventory?merchant_id=${MERCHANT_ID}`);
+      const res = await fetch("/api/inventory", { credentials: "include" });
       const data = await res.json();
       setItems(data.items || []);
       setSynced(true);

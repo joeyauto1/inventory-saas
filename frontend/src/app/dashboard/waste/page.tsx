@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const MERCHANT_ID = 1; // TODO: get from auth context
 const LOCATION_ID = 1;
 
 const REASONS = [
@@ -42,7 +40,7 @@ export default function WastePage() {
 
   const loadEvents = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/waste?merchant_id=${MERCHANT_ID}&days=30`);
+      const res = await fetch("/api/waste?days=30", { credentials: "include" });
       const data = await res.json();
       setEvents(data.events || []);
       setLoaded(true);
@@ -57,11 +55,11 @@ export default function WastePage() {
     setMessage("");
 
     try {
-      const res = await fetch(`${API_URL}/api/waste`, {
+      const res = await fetch("/api/waste", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          merchant_id: MERCHANT_ID,
           location_id: LOCATION_ID,
           square_catalog_object_id: "manual",
           item_name: itemName,
@@ -91,7 +89,7 @@ export default function WastePage() {
   };
 
   const deleteEvent = async (id: number) => {
-    await fetch(`${API_URL}/api/waste/${id}?merchant_id=${MERCHANT_ID}`, { method: "DELETE" });
+    await fetch(`/api/waste/${id}`, { method: "DELETE", credentials: "include" });
     loadEvents();
   };
 

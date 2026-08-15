@@ -2,14 +2,12 @@
 
 import { useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function Home() {
   const [loading, setLoading] = useState(false);
 
   const handleConnect = () => {
     setLoading(true);
-    window.location.href = `${API_URL}/auth/login`;
+    window.location.href = "/auth/login";
   };
 
   return (

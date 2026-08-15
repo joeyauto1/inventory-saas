@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const MERCHANT_ID = 1;
-
 interface RecipeData {
   id: number;
   name: string;
@@ -61,7 +58,7 @@ export default function RecipesPage() {
   const [ingCost, setIngCost] = useState("");
 
   const loadRecipes = async () => {
-    const res = await fetch(`${API_URL}/api/recipes?merchant_id=${MERCHANT_ID}`);
+    const res = await fetch("/api/recipes", { credentials: "include" });
     const data = await res.json();
     setRecipes(data.recipes || []);
     setLoaded(true);
@@ -70,11 +67,11 @@ export default function RecipesPage() {
   const createRecipe = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    await fetch(`${API_URL}/api/recipes`, {
+    await fetch("/api/recipes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
-        merchant_id: MERCHANT_ID,
         name: name,
         selling_price: parseFloat(sellingPrice) || 0,
         portions: parseInt(portions) || 1,
@@ -89,7 +86,7 @@ export default function RecipesPage() {
 
   const viewRecipe = async (id: number) => {
     setSelected(id);
-    const res = await fetch(`${API_URL}/api/recipes/${id}?merchant_id=${MERCHANT_ID}`);
+    const res = await fetch(`/api/recipes/${id}`, { credentials: "include" });
     const data = await res.json();
     setDetail(data);
   };
@@ -97,12 +94,12 @@ export default function RecipesPage() {
   const addIngredient = async () => {
     if (!selected || !ingItemName || !ingQty) return;
     await fetch(
-      `${API_URL}/api/recipes/${selected}/ingredients`,
+      `/api/recipes/${selected}/ingredients`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          merchant_id: MERCHANT_ID,
           square_catalog_object_id: "manual",
           item_name: ingItemName,
           quantity: parseFloat(ingQty) || 0,
@@ -119,8 +116,9 @@ export default function RecipesPage() {
 
   const removeIngredient = async (ingId: number) => {
     if (!selected) return;
-    await fetch(`${API_URL}/api/recipes/${selected}/ingredients/${ingId}?merchant_id=${MERCHANT_ID}`, {
+    await fetch(`/api/recipes/${selected}/ingredients/${ingId}`, {
       method: "DELETE",
+      credentials: "include",
     });
     viewRecipe(selected);
   };

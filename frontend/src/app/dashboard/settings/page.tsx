@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 type SubscriptionStatus = "trialing" | "active" | "canceled" | "past_due" | "unknown";
 
 export default function SettingsPage() {
@@ -15,7 +13,7 @@ export default function SettingsPage() {
 
   const loadStatus = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/billing/status`, {
+      const res = await fetch("/api/billing/status", {
         credentials: "include",
       });
       if (res.status === 401) {
@@ -42,7 +40,7 @@ export default function SettingsPage() {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/api/billing/checkout`, {
+      const res = await fetch("/api/billing/checkout", {
         method: "POST",
         credentials: "include",
       });
@@ -64,7 +62,7 @@ export default function SettingsPage() {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/api/billing/portal`, {
+      const res = await fetch("/api/billing/portal", {
         credentials: "include",
       });
       if (!res.ok) {

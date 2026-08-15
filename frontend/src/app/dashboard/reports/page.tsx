@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const MERCHANT_ID = 1;
-
 interface ReasonBreakdown {
   reason: string;
   total: string;
@@ -31,7 +28,7 @@ export default function ReportsPage() {
 
   const loadReport = async () => {
     setLoading(true);
-    const res = await fetch(`${API_URL}/api/reports/waste?merchant_id=${MERCHANT_ID}&days=${days}`);
+    const res = await fetch(`/api/reports/waste?days=${days}`, { credentials: "include" });
     const json = await res.json();
     setData(json);
     setLoading(false);
