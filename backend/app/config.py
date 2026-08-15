@@ -8,6 +8,11 @@ class Settings:
     SQUARE_APP_ID: str = os.environ.get("SQUARE_APP_ID", "")
     SQUARE_APP_SECRET: str = os.environ.get("SQUARE_APP_SECRET", "")
     SQUARE_WEBHOOK_SIGNATURE_KEY: str = os.environ.get("SQUARE_WEBHOOK_SIGNATURE_KEY", "")
+    # The webhook notification URL as registered in the Square Developer Console.
+    # It is part of the signed payload (verify_signature signs notification_url +
+    # request_body), so verification cannot work unless this matches the Console
+    # registration exactly.
+    SQUARE_NOTIFICATION_URL: str = os.environ.get("SQUARE_NOTIFICATION_URL", "")
     SQUARE_SANDBOX: bool = os.environ.get("SQUARE_SANDBOX", "true").lower() == "true"
 
     # Database

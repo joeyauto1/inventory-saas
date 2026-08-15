@@ -1,16 +1,22 @@
-"""Square webhook must fail closed.
+"""Square webhook must fail closed, and accept a signature from outside the implementation.
 
-Round-1 review finding F2: the handler skipped signature verification entirely
-when ``SQUARE_WEBHOOK_SIGNATURE_KEY`` was unset — a missing key waved every
-request through unverified. These tests pin the fail-closed behaviour: a missing
-key, a missing signature header, and a wrong signature must all be refused, and
-a correctly-signed event must still be accepted.
+F6 (round 2): the handler's signature algorithm did not match Square's — it read
+the wrong header (`x-square-signature`, the legacy SHA-1 header), signed the body
+only instead of `notification_url + body`, and hex-encoded instead of base64. The
+round-2 test computed its expected signature with the handler's own algorithm, so
+it proved self-consistency and could not catch any of that.
 
-The ``test_missing_key_is_refused`` case is the regression guard: under the old
-``if settings.SQUARE_WEBHOOK_SIGNATURE_KEY:`` shape, an unset key skipped
-verification and returned 200, so this test fails if the guard is ever reverted.
+This test is now the oracle:
+
+- The fail-closed cases (missing key, missing notification URL, missing header,
+  wrong signature) must all 401.
+- The positive case computes its expected signature from Square's DOCUMENTED
+  algorithm, reproduced independently with stdlib (hmac + hashlib + base64). The
+  handler delegates to Square's SDK helper; this test never imports it, so the
+  two cannot silently agree on a wrong algorithm.
 """
 
+import base64
 import hashlib
 import hmac
 
@@ -23,13 +29,26 @@ from app.config import settings
 from app.database import Base, get_db
 from app.main import app
 
+SIGNATURE_HEADER = "x-square-hmacsha256-signature"
+NOTIFICATION_URL = "https://inventory-saas-4.onrender.com/webhooks/square"
+KEY = "test-signature-key"
 
-def _sign(key: str, body: bytes) -> str:
-    return hmac.new(key.encode(), body, hashlib.sha256).hexdigest()
+
+def _square_signature(key: str, notification_url: str, body: str) -> str:
+    """Square's documented signature algorithm, reproduced independently.
+
+    This is the oracle. It deliberately does NOT call the SDK helper the handler
+    uses: payload = notification_url + body, HMAC-SHA256, base64. If the handler
+    (or the SDK) ever deviates from this, the positive test fails.
+    """
+    payload = (notification_url + body).encode("utf-8")
+    digest = hmac.new(key.encode("utf-8"), payload, hashlib.sha256).digest()
+    return base64.b64encode(digest).decode("utf-8")
 
 
 def _client(monkeypatch):
     monkeypatch.setattr(settings, "SQUARE_WEBHOOK_SIGNATURE_KEY", "")
+    monkeypatch.setattr(settings, "SQUARE_NOTIFICATION_URL", "")
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -46,8 +65,7 @@ def _client(monkeypatch):
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    client = TestClient(app)
-    return client
+    return TestClient(app)
 
 
 def test_missing_key_is_refused(monkeypatch):
@@ -58,10 +76,19 @@ def test_missing_key_is_refused(monkeypatch):
     """
     client = _client(monkeypatch)
     try:
-        resp = client.post(
-            "/webhooks/square",
-            json={"type": "inventory.count.updated"},
-        )
+        resp = client.post("/webhooks/square", json={"type": "inventory.count.updated"})
+        assert resp.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_missing_notification_url_is_refused(monkeypatch):
+    """The notification URL is part of the signed payload; without it the request
+    cannot be verified and must be refused, not waved through."""
+    client = _client(monkeypatch)
+    try:
+        monkeypatch.setattr(settings, "SQUARE_WEBHOOK_SIGNATURE_KEY", KEY)
+        resp = client.post("/webhooks/square", json={"type": "inventory.count.updated"})
         assert resp.status_code == 401
     finally:
         app.dependency_overrides.clear()
@@ -70,7 +97,8 @@ def test_missing_key_is_refused(monkeypatch):
 def test_missing_signature_is_refused(monkeypatch):
     client = _client(monkeypatch)
     try:
-        monkeypatch.setattr(settings, "SQUARE_WEBHOOK_SIGNATURE_KEY", "test-key")
+        monkeypatch.setattr(settings, "SQUARE_WEBHOOK_SIGNATURE_KEY", KEY)
+        monkeypatch.setattr(settings, "SQUARE_NOTIFICATION_URL", NOTIFICATION_URL)
         resp = client.post(
             "/webhooks/square",
             content=b'{"type": "inventory.count.updated"}',
@@ -84,14 +112,15 @@ def test_missing_signature_is_refused(monkeypatch):
 def test_wrong_signature_is_refused(monkeypatch):
     client = _client(monkeypatch)
     try:
-        monkeypatch.setattr(settings, "SQUARE_WEBHOOK_SIGNATURE_KEY", "test-key")
+        monkeypatch.setattr(settings, "SQUARE_WEBHOOK_SIGNATURE_KEY", KEY)
+        monkeypatch.setattr(settings, "SQUARE_NOTIFICATION_URL", NOTIFICATION_URL)
         body = b'{"type": "inventory.count.updated"}'
         resp = client.post(
             "/webhooks/square",
             content=body,
             headers={
                 "Content-Type": "application/json",
-                "x-square-signature": "totally-invalid",
+                SIGNATURE_HEADER: "dG90YWxseS1pbnZhbGlk",
             },
         )
         assert resp.status_code == 401
@@ -100,21 +129,24 @@ def test_wrong_signature_is_refused(monkeypatch):
 
 
 def test_correct_signature_is_accepted(monkeypatch):
-    """The 'still works' half: a correctly-signed event must still be processed.
+    """The 'still works' half, with an oracle outside the implementation.
 
-    Fail-closed must not mean fail-always — a valid Square signature returns 200.
+    The expected signature is produced by ``_square_signature`` (stdlib), never
+    by the SDK helper the handler calls — so the test cannot silently agree with
+    a wrong algorithm in the code under test.
     """
     client = _client(monkeypatch)
     try:
-        key = "test-key"
-        monkeypatch.setattr(settings, "SQUARE_WEBHOOK_SIGNATURE_KEY", key)
-        body = b'{"type": "inventory.count.updated"}'
+        monkeypatch.setattr(settings, "SQUARE_WEBHOOK_SIGNATURE_KEY", KEY)
+        monkeypatch.setattr(settings, "SQUARE_NOTIFICATION_URL", NOTIFICATION_URL)
+        body = '{"type": "inventory.count.updated"}'
+        signature = _square_signature(KEY, NOTIFICATION_URL, body)
         resp = client.post(
             "/webhooks/square",
-            content=body,
+            content=body.encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
-                "x-square-signature": _sign(key, body),
+                SIGNATURE_HEADER: signature,
             },
         )
         assert resp.status_code == 200
