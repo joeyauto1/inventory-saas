@@ -1,4 +1,4 @@
-"""Square OAuth routes — login, callback, disconnect."""
+"""Square OAuth routes — login, callback."""
 
 import secrets
 import sys
@@ -197,9 +197,3 @@ async def callback(
             status_code=500,
             detail=f"Internal error. Reference: {correlation_id}",
         )
-
-
-@router.post("/disconnect")
-async def disconnect(db: Session = Depends(get_db)):
-    """Placeholder for disconnect — would need merchant auth middleware."""
-    return {"status": "ok"}
